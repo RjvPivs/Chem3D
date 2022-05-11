@@ -156,6 +156,8 @@ namespace Chem3D
             openFileDialog.ShowDialog();
             if (!String.IsNullOrEmpty(openFileDialog.FileName))
             {
+                mshLine.Clear();
+                mshSphere.Clear();
                 volume.Items.Clear();
                 lBox.Visibility = Visibility.Hidden;
                 lBox.Items.Clear();
@@ -252,7 +254,6 @@ namespace Chem3D
                     }
                     catch
                     {
-
 
                     }
                     try
