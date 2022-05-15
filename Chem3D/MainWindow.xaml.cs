@@ -93,7 +93,7 @@ namespace Chem3D
             }
             catch
             {
-                MessageBox.Show("Невозможно считать CIF");
+                MessageBox.Show("Невозможно считать CIF.");
 
                 volume.Visibility = Visibility.Hidden;
                 volume.Items.Clear();
@@ -103,6 +103,15 @@ namespace Chem3D
             }
             var mol = new Molecule(provider.Atoms, provider.Bonds);
             a = mol.Atoms;
+            if (a.Count == 0)
+            {
+                MessageBox.Show("В структуре отсутствуют атомы. Отображение невозможно.");
+                volume.Visibility = Visibility.Hidden;
+                volume.Items.Clear();
+                lBox.Visibility = Visibility.Hidden;
+                lBox.Items.Clear();
+                return;
+            }
             foreach (var b in a)
             {
                 MeshGeometry3D meh = new MeshGeometry3D();
@@ -147,6 +156,14 @@ namespace Chem3D
             }
             //group.Children.Add(meh.MakeModel(Brushes.Blue));
             //MeshExtensions.AddAxes(group);
+            var txt = new TextBlock
+            {
+                Background = Brushes.LightGray,
+                Text = "Подсчитанный объём:"
+            };
+            volume.Items.Add(txt);
+            volume.Items.Add(Convert.ToString(CountVolume()));
+            volume.Visibility = Visibility.Visible;
         }
 
         private void openCIF_Click(object sender, RoutedEventArgs e)
@@ -163,17 +180,8 @@ namespace Chem3D
                 lBox.Items.Clear();
                 path = openFileDialog.FileName;
                 DefineModel(group);
-                var txt = new TextBlock
-                {
-                    Background = Brushes.LightGray,
-                    Text = "Подсчитанный объём:"
-                };
-                volume.Items.Add(txt);
-                volume.Items.Add("122.385");
-                volume.Visibility = Visibility.Visible;
             }
         }
-        MeshGeometry3D SelectedModel;
         private void viewport_MouseRightButtonDown(object sender, MouseButtonEventArgs e)
         {
             //   if (SelectedModel != null)
@@ -270,6 +278,62 @@ namespace Chem3D
                     }
                 }
             }
+        }
+        private double CountVolume()
+        {
+            List<double[]> lst = new List<double[]>();
+            foreach (var b in a)
+            {
+                double[] db = new double[3];
+                db[0] = Convert.ToDouble(b.Location.X);
+                db[1] = Convert.ToDouble(b.Location.Y);
+                db[2] = Convert.ToDouble(b.Location.Z);
+                lst.Add(db);
+            }
+            var res = MIConvexHull.ConvexHull.Create(lst);
+            var vert = res.Result.Points.ToList();
+
+            var faces = res.Result.Faces.ToList();
+
+            var facesRes = new List<List<Vector3D>>();
+            foreach (var face in faces)
+            {
+                var tempor = new List<Vector3D>();
+                tempor.Add(new Vector3D(vert[vert.IndexOf(face.Vertices[0])].Position[0], vert[vert.IndexOf(face.Vertices[0])].Position[1], vert[vert.IndexOf(face.Vertices[0])].Position[2]));
+                tempor.Add(new Vector3D(vert[vert.IndexOf(face.Vertices[1])].Position[0], vert[vert.IndexOf(face.Vertices[1])].Position[1], vert[vert.IndexOf(face.Vertices[1])].Position[2]));
+                tempor.Add(new Vector3D(vert[vert.IndexOf(face.Vertices[2])].Position[0], vert[vert.IndexOf(face.Vertices[2])].Position[1], vert[vert.IndexOf(face.Vertices[2])].Position[2]));
+                facesRes.Add(tempor);
+            }
+            double resulting = 0;
+            var nullCoord = new Vector3D(vert[0].Position[0], vert[0].Position[1], vert[0].Position[2]);
+
+            foreach (var face in facesRes)
+            {
+                if (!face.Contains(nullCoord))
+                {
+                    resulting += StillCounting(nullCoord, face[0], face[1], face[2]);
+                }
+            }
+            return resulting;
+        }
+        private double StillCounting(Vector3D nullCoord, Vector3D first, Vector3D second, Vector3D third)
+        {
+            double fst = Distance(nullCoord, first), scnd = Distance(nullCoord, second), thrd = Distance(nullCoord, third);
+            double frth = Distance(second, first), fifth = Distance(third, second), sxh = Distance(first, third);
+            double coef = 1.0 / 144.0;
+            return Math.Sqrt(coef * (fst * fst * fifth * fifth * (scnd * scnd + thrd * thrd + frth * frth + sxh * sxh - fst * fst - fifth * fifth) +
+                scnd * scnd * sxh * sxh * (fst * fst + thrd * thrd + frth * frth + fifth * fifth - scnd * scnd - sxh * sxh)
+                + thrd * thrd * frth * frth * (fst * fst + scnd * scnd + fifth * fifth + sxh * sxh - thrd * thrd - frth * frth)
+                - fst * fst * scnd * scnd * frth * frth - scnd * scnd * thrd * thrd * fifth * fifth - fst * fst * thrd * thrd * sxh * sxh - frth * frth * fifth * fifth * sxh * sxh));
+            // fst*fst*fifth*fifth*(scnd*scnd + thrd*thrd+frth*frth+sxh*sxh-fst*fst-fifth*fifth)
+            //scnd*scnd * sxh*sxh * (fst*fst + thrd*thrd+frth*frth + fifth*fifth - scnd*scnd - sxh*sxh)
+            //thrd*thrd * frth*frth * (fst*fst + scnd*scnd+ fifth*fifth + sxh*sxh - thrd*thrd - frth*frth)
+            //- fst*fst*scnd*scnd *frth*frth - scnd*scnd *thrd*thrd * fifth*fifth - fst*fst* thrd*thrd * sxh*sxh - frth*frth *fifth*fifth*sxh*sxh
+            //
+        }
+        private double Distance(Vector3D fst, Vector3D scnd)
+        {
+            return Math.Sqrt(Math.Pow(fst.X - scnd.X, 2) + Math.Pow(fst.Y - scnd.Y, 2) + Math.Pow(fst.Z - scnd.Z, 2));
         }
     }
 }
